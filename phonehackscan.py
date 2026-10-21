@@ -39,7 +39,7 @@ Layers
      indicators (Pegasus, Predator, 100+ stalkerware families, ...).
   3. VirusTotal (optional): file hash of every non-system app.
   4. Android 16 Intrusion Logging: analyse logs downloaded from the phone.
-  5. Expert package: bundle (optionally age-encrypted) a scan for a helpline.
+  5. Expert package: bundle (optionally age-encrypted) a scan for review by UCYBERS.
   6. iPhone: MVT analysis of an encrypted computer backup (Apple Devices / iTunes /
      Finder / idevicebackup2), decrypted temporarily and deleted afterwards.
 Output: HTML report (Arabic / English, one click to switch) in ~/phonehackscan/scan-<date>/report.html
@@ -1359,11 +1359,8 @@ def make_package(tools, age_key):
     else:
         ok(f"Package: {out}")
         warn("This file is NOT encrypted and may contain your SMS backup.")
-        info("Ask the expert for an age public key (starts with age1) and run:  --package age1...")
-    info("Who can help (free for journalists, activists and civil society):")
-    info("  Access Now Digital Security Helpline  https://www.accessnow.org/help/")
-    info("  Amnesty International Security Lab     https://securitylab.amnesty.org/get-help/")
-    info("  Stalkerware (partner / family abuse)   https://stopstalkerware.org")
+        info("Ask UCYBERS for its age public key (starts with age1) and run:  --package age1...")
+    info(f"For an expert review, contact UCYBERS:  {HELP_URL}")
 
 
 # --------------------------------------------------------------------------- #
@@ -1541,9 +1538,8 @@ def _alert_tables(alerts, counts):
     return out
 
 
-HELP_LINKS = ('<a href="https://www.accessnow.org/help/">Access Now Digital Security Helpline</a>',
-              '<a href="https://securitylab.amnesty.org/get-help/">Amnesty Security Lab</a>',
-              '<a href="https://stopstalkerware.org">Coalition Against Stalkerware</a>')
+HELP_URL = "https://ucybers.com"   # where the report and the terminal send people for help
+HELP_LINK = f'<a href="{HELP_URL}">UCYBERS</a>'
 
 
 def make_report(run, mode):
@@ -1784,8 +1780,8 @@ def make_report(run, mode):
     open_cmds = "".join(f"<pre>{_e(tool)} --open-app {_e(a['package'])}</pre>" for a in (examples[:5] or [{"package": "com.example.app"}]))
     remove_html = f"""
 <section><h2>{L("كيف أحذف تطبيقاً لا أعرفه؟ (دليل المبتدئ)", "How do I remove an app I don't recognise? (beginner's guide)")}</h2>
-<div class="callout">{L("<b>قبل أن تحذف:</b> إن كنت تشك أن شخصاً قريباً منك ثبّت التطبيق، فحذفه قد ينبّهه. احتفظ بهذا التقرير، وفكّر في سلامتك أولاً، واطلب المساعدة من " + HELP_LINKS[2] + ".",
-                       "<b>Before you remove anything:</b> if you think someone close to you installed the app, removing it may alert them. Keep this report, think about your safety first, and get help from " + HELP_LINKS[2] + ".")}</div>
+<div class="callout">{L("<b>قبل أن تحذف:</b> إن كنت تشك أن شخصاً قريباً منك ثبّت التطبيق، فحذفه قد ينبّهه. احتفظ بهذا التقرير، وفكّر في سلامتك أولاً، واطلب المساعدة من " + HELP_LINK + ". وإن كنت في خطر مباشر فاتصل برقم الطوارئ في بلدك.",
+                       "<b>Before you remove anything:</b> if you think someone close to you installed the app, removing it may alert them. Keep this report, think about your safety first, and get help from " + HELP_LINK + ". If you are in immediate danger, call your local emergency number.")}</div>
 <ol>
 <li>{L("<b>افتح صفحة التطبيق على الهاتف.</b> الهاتف يعرض أسماء التطبيقات لا أسماء الحزم (مثل com.company.app)، فأسهل طريقة: صِل الهاتف بالكابل وشغّل الأمر التالي، فتُفتح صفحة «معلومات التطبيق» على الهاتف مباشرة:",
        "<b>Open the app's page on the phone.</b> The phone shows app names, not package names (like com.company.app), so the easiest way is to connect the phone and run the command below: the app's “App info” page opens on the phone.")}
@@ -1796,8 +1792,8 @@ def make_report(run, mode):
 <li>{L("<b>إن كان زر «إلغاء التثبيت» رمادياً</b> فالتطبيق «مسؤول جهاز»: ابحث في الإعدادات عن «تطبيقات مسؤول الجهاز» (Device admin apps)، وأوقف التطبيق هناك، ثم ارجع إلى صفحته.",
        "<b>If “Uninstall” is greyed out,</b> the app is a device admin: search Settings for “Device admin apps”, switch the app off there, then go back to its page.")}</li>
 <li>{L("<b>اضغط «إلغاء التثبيت» ثم «موافق».</b>", "<b>Tap “Uninstall”, then “OK”.</b>")}</li>
-<li>{L("<b>إن لم يُحذف أو عاد من جديد،</b> فقد يكون جزءاً من إدارة الجهاز أو مثبّتاً في النظام: اطلب المساعدة من الجهات في الأسفل، والحل الأخير «إعادة ضبط المصنع الآمنة».",
-       "<b>If it will not go away or comes back,</b> it may be part of device management or built into the system: ask the helplines below; the last resort is the “safe factory reset”.")}</li>
+<li>{L("<b>إن لم يُحذف أو عاد من جديد،</b> فقد يكون جزءاً من إدارة الجهاز أو مثبّتاً في النظام: اطلب المساعدة من UCYBERS، والحل الأخير «إعادة ضبط المصنع الآمنة».",
+       "<b>If it will not go away or comes back,</b> it may be part of device management or built into the system: ask UCYBERS for help; the last resort is the “safe factory reset”.")}</li>
 <li>{L("<b>بعد الحذف:</b> غيّر كلمة مرور حساب Google من جهاز آخر، ثم أعد الفحص.", "<b>Afterwards:</b> change your Google password from another device, then scan again.")}</li>
 </ol></section>"""
 
@@ -1845,10 +1841,10 @@ def make_report(run, mode):
 <section><h2>{L("ماذا أفعل الآن؟", "What should I do now?")}</h2><ol>
 <li>{L("<b>أمّن حسابك:</b> غيّر كلمة مرور حساب Google من جهاز آخر نظيف، وفعّل التحقق بخطوتين، وراجع الأجهزة المتصلة في <a href='https://myaccount.google.com/device-activity'>myaccount.google.com/device-activity</a>.",
        "<b>Secure your account:</b> change your Google password from another, clean device, turn on 2-step verification, and review signed-in devices at <a href='https://myaccount.google.com/device-activity'>myaccount.google.com/device-activity</a>.")}</li>
-<li>{L(f"<b>إن ظهر تنبيه «حرج» أو «مرتفع»</b> أو كنت صحفياً أو ناشطاً: اطلب مراجعة مختص مجاناً من {HELP_LINKS[0]} أو {HELP_LINKS[1]}. جهّز لهم حزمة الفحص بالأمر:",
-       f"<b>If there is a “critical” or “high” alert,</b> or you are a journalist or activist: ask for a free expert review from {HELP_LINKS[0]} or {HELP_LINKS[1]}. Prepare the scan package with:")}
+<li>{L(f"<b>إن ظهر تنبيه «حرج» أو «مرتفع»</b> أو كنت صحفياً أو ناشطاً: اطلب مراجعة مختص من {HELP_LINK}. جهّز حزمة الفحص بالأمر:",
+       f"<b>If there is a “critical” or “high” alert,</b> or you are a journalist or activist: ask {HELP_LINK} for an expert review. Prepare the scan package with:")}
 <pre>{_e(tool)} --package age1...</pre>
-<span class="muted small">{L("اطلب منهم مفتاح age العام (يبدأ بـ age1) لتُشفَّر الحزمة فلا يفتحها غيرهم.", "Ask them for their age public key (it starts with age1) so the package is encrypted for them only.")}</span></li>
+<span class="muted small">{L("اطلب من UCYBERS مفتاح age العام (يبدأ بـ age1) لتُشفَّر الحزمة فلا يفتحها غيرها.", "Ask UCYBERS for its age public key (it starts with age1) so the package is encrypted for UCYBERS only.")}</span></li>
 <li>{L("<b>بعد الانتهاء:</b> أوقف «تصحيح USB» وأوقف «خيارات المطوّر»، واضغط «إلغاء تفويضات تصحيح USB».",
        "<b>When you are done:</b> turn off “USB debugging” and “Developer options”, and tap “Revoke USB debugging authorizations”.")}</li>
 </ol></section>
@@ -1951,8 +1947,8 @@ def make_report_iphone(run):
 
     remove_html = f"""
 <section><h2>{L("كيف أحذف تطبيقاً أو ملف تعريف لا أعرفه؟ (دليل المبتدئ)", "How do I remove an app or profile I don't recognise? (beginner's guide)")}</h2>
-<div class="callout">{L("<b>قبل أن تحذف:</b> إن كنت تشك أن شخصاً قريباً منك وراء ذلك، فالحذف قد ينبّهه. احتفظ بهذا التقرير وفكّر في سلامتك أولاً، واطلب المساعدة من " + HELP_LINKS[2] + ".",
-                       "<b>Before you remove anything:</b> if you think someone close to you is behind it, removing it may alert them. Keep this report, think about your safety first, and get help from " + HELP_LINKS[2] + ".")}</div>
+<div class="callout">{L("<b>قبل أن تحذف:</b> إن كنت تشك أن شخصاً قريباً منك وراء ذلك، فالحذف قد ينبّهه. احتفظ بهذا التقرير وفكّر في سلامتك أولاً، واطلب المساعدة من " + HELP_LINK + ". وإن كنت في خطر مباشر فاتصل برقم الطوارئ في بلدك.",
+                       "<b>Before you remove anything:</b> if you think someone close to you is behind it, removing it may alert them. Keep this report, think about your safety first, and get help from " + HELP_LINK + ". If you are in immediate danger, call your local emergency number.")}</div>
 <ol>
 <li>{L("<b>ملف تعريف:</b> الإعدادات ← عام ← «VPN وإدارة الأجهزة» ← اضغط الملف ← «إزالة الملف»، ثم أدخل رمز الهاتف. لا تحذف ملف جهة عملك دون الرجوع إليها.",
        "<b>A profile:</b> Settings > General > “VPN & Device Management” > tap the profile > “Remove Profile”, then enter the passcode. Don't remove your employer's profile without asking them.")}</li>
@@ -1989,8 +1985,8 @@ def make_report_iphone(run):
        "<b>Secure your Apple Account:</b> from another, clean device change the Apple Account password and make sure two-factor authentication is on. Then on the iPhone: Settings > your name, scroll to the device list and remove any device you don't recognise.")}</li>
 <li>{L("<b>فحص الأمان (Safety Check):</b> الإعدادات ← الخصوصية والأمن ← فحص الأمان. يعرض من تشارك معه موقعك وصورك وبياناتك، ويوقف المشاركة بضغطة.",
        "<b>Safety Check:</b> Settings > Privacy & Security > Safety Check. It shows who you share your location, photos and data with, and stops sharing in one tap.")}</li>
-<li>{L(f"<b>إن ظهر تنبيه «حرج» أو «مرتفع»</b> أو كنت صحفياً أو ناشطاً: اطلب مراجعة مختص مجاناً من {HELP_LINKS[0]} أو {HELP_LINKS[1]}. جهّز لهم حزمة الفحص بالأمر:",
-       f"<b>If there is a “critical” or “high” alert,</b> or you are a journalist or activist: ask for a free expert review from {HELP_LINKS[0]} or {HELP_LINKS[1]}. Prepare the scan package with:")}
+<li>{L(f"<b>إن ظهر تنبيه «حرج» أو «مرتفع»</b> أو كنت صحفياً أو ناشطاً: اطلب مراجعة مختص من {HELP_LINK}. جهّز حزمة الفحص بالأمر:",
+       f"<b>If there is a “critical” or “high” alert,</b> or you are a journalist or activist: ask {HELP_LINK} for an expert review. Prepare the scan package with:")}
 <pre>{_e(tool)} --package age1...</pre></li>
 </ol></section>
 
