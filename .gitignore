@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Scan results and secrets must never be published
+scan-*/
+*.age
+.vt_api_key
+
+# OS files
+.DS_Store
+Thumbs.db

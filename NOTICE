@@ -1,0 +1,26 @@
+PhoneHackScan - Android & iPhone intrusion check, powered by UCYBERS
+Copyright (C) 2026 UCYBERS
+
+This program is licensed under the GNU General Public License version 3 (see the
+LICENSE file), with the following additional terms, which are permitted by
+section 7 of that licence.
+
+a) Attribution (section 7b). Every copy or modified version of this program that
+   you convey, free of charge or for a fee, must keep the attribution
+   "powered by UCYBERS" in the program's start banner and in every report the
+   program produces. It must stay clearly visible and readable: not removed,
+   hidden, shrunk, or coloured to blend into the background.
+
+b) Modified versions (section 7c). A modified version that you convey must be
+   clearly marked as different from the original and must not be named
+   PhoneHackScan.
+
+c) Names and logo (section 7e). This licence grants no right to use the names
+   PhoneHackScan or UCYBERS, or the UCYBERS logo, as trademarks, except as needed
+   to give the attribution required in (a).
+
+The Cairo font embedded in the report is not covered by the GPL. It is under the
+SIL Open Font License 1.1; the full text is at the end of phonehackscan.py.
+
+The tools that PhoneHackScan downloads when it runs (Android platform-tools,
+androidqf, MVT) are not part of this program and keep their own licences.
