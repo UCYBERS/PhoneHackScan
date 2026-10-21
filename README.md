@@ -78,9 +78,9 @@ cd PhoneHackScan
 Without Git:
 
 ```powershell
-Invoke-WebRequest https://github.com/ucybers/PhoneHackScan/archive/refs/heads/main.zip -OutFile PhoneHackScan.zip
+Invoke-WebRequest https://github.com/ucybers/PhoneHackScan/archive/refs/heads/master.zip -OutFile PhoneHackScan.zip
 Expand-Archive PhoneHackScan.zip -DestinationPath .
-cd PhoneHackScan-main
+cd PhoneHackScan-master
 .\phonehackscan.cmd
 ```
 
