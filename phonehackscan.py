@@ -59,6 +59,7 @@ Usage
   python phonehackscan.py --intrusion-logs PATH  analyse Intrusion Logging files (.zip or folder)
   python phonehackscan.py --iphone [FOLDER]      analyse an iPhone backup (found automatically)
   python phonehackscan.py --open-app PACKAGE     open an app's page on the phone to review / uninstall it
+  python phonehackscan.py --iocs FILE            also check against your own STIX2 indicators file
   python phonehackscan.py --package [AGE_KEY]    bundle the latest scan for a security expert
 On Windows you can also double-click phonehackscan.cmd.
 """
@@ -93,6 +94,11 @@ AQF_FALLBACK_VER = "1.8.3"
 EICAR_SHA256 = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
 # Indicators are refreshed explicitly in ensure_mvt(), so the analysis itself stays offline.
 MVT_QUIET = ["--disable-update-check", "--disable-indicator-update-check"]
+EXTRA_IOCS = []   # set from --iocs
+
+
+def ioc_args():
+    return [x for f in EXTRA_IOCS for x in ("-i", f)]
 
 IS_WIN = os.name == "nt"
 OFFLINE = os.environ.get("ANDROID_SCAN_OFFLINE") == "1"   # skip all downloads (testing)
@@ -594,6 +600,13 @@ KNOWN_STORES = {
     "com.samsung.android.app.updatecenter", "com.sec.android.preloadinstaller",
     "com.facebook.system", "com.miui.packageinstaller.update",
 }
+STORE_NAMES = {
+    "com.android.vending": "Google Play", "com.sec.android.app.samsungapps": "Galaxy Store",
+    "com.huawei.appmarket": "AppGallery", "com.xiaomi.mipicks": "GetApps", "com.xiaomi.market": "Mi Store",
+    "org.fdroid.fdroid": "F-Droid", "com.amazon.venezia": "Amazon Appstore", "com.aurora.store": "Aurora Store",
+}
+PACKAGE_INSTALLERS = {"com.google.android.packageinstaller", "com.android.packageinstaller",
+                      "com.samsung.android.packageinstaller", "com.miui.packageinstaller"}
 SENSITIVE = {
     "android.permission.ACCESS_FINE_LOCATION": "location",
     "android.permission.ACCESS_BACKGROUND_LOCATION": "background_location",
@@ -988,7 +1001,7 @@ def run_mvt(tools, plat, aqf_out, run):
         warn("No androidqf data to analyse; skipping MVT.")
         return
     info(f"Analysing {aqf_out}")
-    subprocess.run([tools.mvt, *MVT_QUIET, "check-androidqf", "-o", str(out), str(aqf_out)], env=mvt_env())
+    subprocess.run([tools.mvt, *MVT_QUIET, "check-androidqf", *ioc_args(), "-o", str(out), str(aqf_out)], env=mvt_env())
     mvt_failed_hint(plat, out, f'check-androidqf -o "<output folder>" "<{aqf_out.name}>"')
 
 
@@ -1095,7 +1108,7 @@ def run_intrusion_logs(tools, plat, path, run):
     if path.name.endswith(".age"):
         die("This file is encrypted. Decrypt it first, then pass the .zip or folder.")
     out = run / "mvt"
-    subprocess.run([tools.mvt, *MVT_QUIET, "check-intrusion-logs", "-o", str(out), str(path)], env=mvt_env())
+    subprocess.run([tools.mvt, *MVT_QUIET, "check-intrusion-logs", *ioc_args(), "-o", str(out), str(path)], env=mvt_env())
     mvt_failed_hint(plat, out, f'check-intrusion-logs -o "<output folder>" "<{path.name}>"')
 
 
@@ -1293,7 +1306,7 @@ def scan_iphone(tools, plat, path, run):
         step("3. Decrypt the backup")
         target = decrypt_iphone_backup(tools, backup, run)
     step(("4" if backup["encrypted"] else "3") + ". Analysis with MVT")
-    subprocess.run([tools.mvt_ios, *MVT_QUIET, "check-backup", "-o", str(run / "mvt"), str(target)], env=mvt_env())
+    subprocess.run([tools.mvt_ios, *MVT_QUIET, "check-backup", *ioc_args(), "-o", str(run / "mvt"), str(target)], env=mvt_env())
     mvt_failed_hint(plat, run / "mvt", f'check-backup -o "<output folder>" "<{target.name}>"')
     if backup["encrypted"]:
         info("The decrypted copy holds your messages, photos and other data without encryption.")
@@ -1366,10 +1379,11 @@ FLAGS = {
     "admin": ("مسؤول جهاز (Device admin) — يصعّب حذفه", "Device admin — harder to remove"),
     "accessibility": ("خدمة إمكانية الوصول — يقرأ الشاشة ويتحكم باللمس",
                       "Accessibility service — can read the screen and tap for you"),
-    "notifications": ("يقرأ كل الإشعارات والرسائل", "Reads all notifications and messages"),
+    "notifications": ("وصول للإشعارات — يستطيع قراءة محتوى الإشعارات ومنها معاينات الرسائل",
+                      "Notification access — can read notification content, including message previews"),
     "keyboard": ("لوحة مفاتيح — يرى ما تكتبه", "Keyboard — sees what you type"),
     "vpn": ("VPN دائم التشغيل — يمر عبره كل اتصالك", "Always-on VPN — all your traffic goes through it"),
-    "hidden": ("بلا أيقونة في قائمة التطبيقات", "No icon in the app drawer"),
+    "hidden": ("بلا أيقونة في قائمة التطبيقات (شائع في خدمات النظام)", "No icon in the app drawer (common for system services)"),
     "sideloaded": ("مثبّت من خارج متجر معروف", "Installed from outside a known store"),
     "profile_manager": ("يدير ملف العمل أو المجلد الآمن — طبيعي", "Manages the work profile or Secure Folder — normal"),
 }
@@ -1386,7 +1400,7 @@ CSS = """
   font-weight:400 700; font-style:normal; font-display:swap; }
 :root { color-scheme:dark; --bg:#0d0d10; --card:#15151a; --ink:#ecebf0; --muted:#9d9ca6; --line:#27272f;
   --brand:#b5003c; --accent:#ff4f86; --good:#4fd18b; --good-bg:#0e2519; --mid:#f2b04a; --mid-bg:#2b210f;
-  --bad:#ff6b6b; --bad-bg:#34111a; --hl:#25111a; --chip:#23232b; }
+  --bad:#ff6b6b; --bad-bg:#34111a; --hl:#251f12; --chip:#23232b; }
 * { box-sizing:border-box; }
 html[lang="ar"] .en, html[lang="en"] .ar { display:none !important; }
 body { margin:0; color:var(--ink); font:16px/1.8 "Cairo","Segoe UI",Tahoma,system-ui,sans-serif;
@@ -1431,6 +1445,9 @@ ul.cols { columns:3 220px; }
 .credit { text-align:center; padding:18px 16px 30px; border-top:1px solid var(--line); color:var(--muted);
   font:500 15px/1.6 "Cairo",system-ui,sans-serif; letter-spacing:.3px; }
 .credit b { color:#fff; font-weight:700; background:linear-gradient(90deg,#d61a5c,#b5003c); padding:1px 10px; border-radius:6px; }
+.tier { display:inline-block; margin-top:4px; padding:0 9px; border-radius:6px; font-size:.78rem; font-weight:600; }
+.tier.review { background:var(--mid-bg); color:var(--mid); } .tier.info { background:var(--chip); color:var(--muted); }
+td.traits { min-width:250px; }
 .callout { border-inline-start:4px solid var(--brand); padding:8px 12px; background:#1d1016; border-radius:6px; margin:10px 0; }
 """
 
@@ -1581,9 +1598,11 @@ def make_report(run, mode):
             "Your phone runs Android 16. Advanced Protection is most likely available; Intrusion Logging needs the December 2025 update or later, so update first.") + "</p>"
     else:
         v = _e(dev.get("android", "?"))
-        ap_status = '<p class="warn">' + L(
-            f"هاتفك يعمل بأندرويد {v}. «الحماية المتقدمة» تحتاج أندرويد 16، فإن لم يصل هاتفك تحديثه فاعتمد على بقية النصائح في هذا القسم.",
-            f"Your phone runs Android {v}. Advanced Protection needs Android 16; if your phone cannot get it, rely on the other tips in this section.") + "</p>"
+        ap_status = '<p class="muted">' + L(
+            f"هاتفك يعمل بأندرويد {v}. «الحماية المتقدمة» و«سجل التسلل» يحتاجان أندرويد 16، فلم نضعهما هنا. النصائح التالية تعمل على إصدار هاتفك.",
+            f"Your phone runs Android {v}. Advanced Protection and Intrusion Logging need Android 16, so they are left out here. The tips below work on your version.") + "</p>"
+    # Unknown version (Intrusion Logging analysis only): the logs themselves mean Android 16
+    show_ap = sdk >= 36 or sdk == 0 or mode == "logs"
 
     # Verdict
     if (mvt_ran or vt_strong) and serious:
@@ -1674,28 +1693,48 @@ def make_report(run, mode):
         vt_html = ""
 
     # Apps
+    def installer_txt(i):
+        if not i or i == "null":
+            return L("غير معروف / ADB", "Unknown / ADB")
+        if i in PACKAGE_INSTALLERS:
+            return L("ملف APK (مثبّت الحزم)", "APK file (package installer)") + f'<div class="muted small">{_ltr(i)}</div>'
+        if i in STORE_NAMES:
+            return _e(STORE_NAMES[i]) + f'<div class="muted small">{_ltr(i)}</div>'
+        return _ltr(i)
+
     def app_rows(lst):
         out = []
         for a in lst:
             flags = "".join(f'<span class="chip flag">{L(*FLAGS.get(f, (f, f)))}</span>' for f in a["flags"])
             perms_ar = "، ".join(PERMS.get(p, (p, p))[0] for p in a.get("permissions", []))
             perms_en = ", ".join(PERMS.get(p, (p, p))[1] for p in a.get("permissions", []))
-            perms = L(perms_ar, perms_en) if perms_ar else "—"
-            cls = "hl" if a.get("review") else ""
-            out.append(f'<tr class="{cls}"><td>{_ltr(a["package"])}<div class="muted small">{_e(a.get("version", ""))}</div></td>'
-                       f'<td>{flags}</td><td>{perms}</td><td>{_ltr(a.get("installer", ""))}</td>'
+            perms = L(perms_ar, perms_en) if perms_ar else f'<span class="muted">{L("لا شيء", "None")}</span>'
+            if a.get("review"):
+                cls, tier = "hl", f'<span class="tier review">{L("للمراجعة", "Needs review")}</span>'
+            else:
+                cls, tier = "", f'<span class="tier info">{L("للعلم", "Info")}</span>'
+            out.append(f'<tr class="{cls}"><td>{_ltr(a["package"])}<div class="muted small">{_e(a.get("version", ""))}</div>{tier}</td>'
+                       f'<td class="traits">{flags}</td><td>{perms}</td><td>{installer_txt(a.get("installer", ""))}</td>'
                        f'<td dir="ltr" class="ltrcell small">{_e(a.get("installed", ""))}</td></tr>')
         return "".join(out)
+
+    def apps_tbl(lst):
+        return ('<div class="scroll"><table><thead><tr>'
+                f'<th>{L("التطبيق (اسم الحزمة)", "App (package name)")}</th><th>{L("الصفات", "Traits")}</th>'
+                f'<th>{L("صلاحيات حساسة ممنوحة", "Sensitive permissions")}</th><th>{L("مصدر التثبيت", "Installed by")}</th>'
+                f'<th>{L("تاريخ التثبيت", "Installed on")}</th></tr></thead><tbody>{app_rows(lst)}</tbody></table></div>')
 
     if not apps_ok:
         msg = _ltr(q.get("apps_error", ""))
         apps_table = '<p class="warn">' + L(f"تعذّرت قراءة قائمة التطبيقات من الهاتف، فهذا القسم فارغ لهذا السبب وليس لأن الهاتف خالٍ من التطبيقات. رسالة الهاتف: {msg}",
                                             f"The app list could not be read from the phone, so this section is empty for that reason — not because the phone has no apps. Phone message: {msg}") + "</p>"
     elif apps:
-        apps_table = ('<div class="scroll"><table><thead><tr>'
-                      f'<th>{L("التطبيق (اسم الحزمة)", "App (package name)")}</th><th>{L("الصفات", "Traits")}</th>'
-                      f'<th>{L("صلاحيات حساسة ممنوحة", "Sensitive permissions")}</th><th>{L("مصدر التثبيت", "Installed by")}</th>'
-                      f'<th>{L("تاريخ التثبيت", "Installed on")}</th></tr></thead><tbody>{app_rows(apps)}</tbody></table></div>')
+        info_apps = [a for a in apps if not a.get("review")]
+        apps_table = (apps_tbl(review) if review else
+                      f'<p class="good-txt">{L("لا يوجد تطبيق يحتاج مراجعة.", "No app needs review.")}</p>')
+        if info_apps:
+            apps_table += (f'<details><summary>{L(f"تطبيقات أخرى بصفات شائعة، للعلم فقط ({len(info_apps)})", f"Other apps with common traits, for information only ({len(info_apps)})")}</summary>'
+                           f'{apps_tbl(info_apps)}</details>')
     else:
         apps_table = f'<p class="muted">{L("لا توجد تطبيقات بصفات تستحق الذكر.", "No apps with notable traits.")}</p>'
 
@@ -1723,7 +1762,7 @@ def make_report(run, mode):
   <div><h3>{L("تطبيقات مسؤول الجهاز (Device admin)", "Device admin apps")}</h3>{li_list(q.get("admins", []))}
        <p class="muted small">{L("وجود <code>com.google.android.gms</code> هنا طبيعي (خدمة «العثور على جهازي»).", "<code>com.google.android.gms</code> here is normal (Find My Device).")}</p></div>
   <div><h3>{L("خدمات إمكانية الوصول المفعّلة", "Enabled accessibility services")}</h3>{li_list(q.get("accessibility", []))}</div>
-  <div><h3>{L("تطبيقات تقرأ الإشعارات", "Apps that read notifications")}</h3>{li_list(q.get("notification_listeners", []))}</div>
+  <div><h3>{L("تطبيقات لها وصول للإشعارات", "Apps with notification access")}</h3>{li_list(q.get("notification_listeners", []))}</div>
   <div><h3>{L("لوحات المفاتيح المفعّلة", "Enabled keyboards")}</h3>{li_list(q.get("keyboards", []))}</div>
   <div><h3>{L("الشبكة", "Network")}</h3><p>{L("VPN دائم التشغيل:", "Always-on VPN:")} {vpn_txt}</p>
        <p>{L("وكيل HTTP عام (Proxy):", "Global HTTP proxy:")} {proxy_txt}</p>
@@ -1735,8 +1774,8 @@ def make_report(run, mode):
         f'<p class="muted small">{L("لم يدعم هذا الهاتف فحص الأيقونات المخفية، فتم تخطيه.", "This phone does not support the hidden-icon check, so it was skipped.")}</p>'
     quick_sections = f"""
 <section><h2>{L(f"تطبيقات تستحق نظرة ({len(review)} للمراجعة أولاً، {len(apps)} إجمالاً)", f"Apps worth a look ({len(review)} to review first, {len(apps)} in total)")}</h2>
-<p class="muted small">{L("الصفوف المظللة هي الأولى بالمراجعة. ابحث عن اسم أي حزمة لا تعرفها، وتأكد أنك ثبّتها بنفسك وتحتاج صلاحياتها.",
-                          "Highlighted rows come first. Look up any package name you don't recognise, and make sure you installed it yourself and need its permissions.")}</p>
+<p class="muted small">{L("«للمراجعة»: صلاحيات قوية مع صفات شائعة في برامج التجسس. «للعلم»: صفات شائعة في التطبيقات العادية. هذه قدرات يملكها التطبيق وليست دليلاً على التجسس، فالدليل المؤكد هو تطابق MVT أو VirusTotal في القسم السابق. ابحث عن اسم أي حزمة لا تعرفها، وتأكد أنك ثبّتها بنفسك وتحتاج صلاحياتها.",
+                          "“Needs review”: powerful access combined with traits common in spyware. “Info”: traits common in ordinary apps. These are things an app can do, not evidence of spyware; a confirmed finding is an MVT or VirusTotal match in the section above. Look up any package name you don't recognise, and make sure you installed it yourself and need its access.")}</p>
 {hidden_note}{apps_table}</section>
 <section><h2>{L("إعدادات الهاتف الحساسة", "Sensitive phone settings")}</h2>{settings_html}</section>""" if has_quick else ""
 
@@ -1762,6 +1801,20 @@ def make_report(run, mode):
 <li>{L("<b>بعد الحذف:</b> غيّر كلمة مرور حساب Google من جهاز آخر، ثم أعد الفحص.", "<b>Afterwards:</b> change your Google password from another device, then scan again.")}</li>
 </ol></section>"""
 
+    ap_items = f'''<li>{L("<b>الحماية المتقدمة (Advanced Protection):</b> ابحث في الإعدادات عن «Advanced Protection» أو «الحماية المتقدمة» وفعّلها. تمنع تثبيت التطبيقات من خارج المتجر، وتوقف شبكات 2G، وتحمي منفذ USB والهاتف مقفل، وتشدّد إعدادات الحماية الأخرى. قد تقيّد بعض الميزات التي تستخدمها.",
+       "<b>Advanced Protection:</b> search Settings for “Advanced Protection” and turn it on. It blocks installing apps from outside the store, turns off 2G, protects the USB port while the phone is locked, and tightens other protections. It may limit some features you use.")}</li>
+<li>{L(f"<b>سجل التسلل (Intrusion Logging):</b> من داخل «الحماية المتقدمة» فعّل «Intrusion Logging». يحفظ الهاتف لمدة 12 شهراً، بتشفير لا يفتحه غيرك، سجلاً بتثبيت التطبيقات واستعلامات DNS وعناوين IP وتغييرات الشهادات. لتحليله بنفسك: نزّل السجلات من «Intrusion Logging ← Access logs»، ثم:",
+       "<b>Intrusion Logging:</b> inside Advanced Protection, turn on “Intrusion Logging”. For 12 months the phone keeps an encrypted log, readable only by you, of app installs, DNS lookups, IP addresses and certificate changes. To analyse it yourself, download the logs from “Intrusion Logging > Access logs”, then:")}
+<pre>{_e(tool)} --intrusion-logs intrusion-logs.zip</pre></li>''' if show_ap else f'''<li>{L("<b>Google Play Protect:</b> في متجر Play اضغط صورة حسابك ← Play Protect، وتأكد أن فحص التطبيقات مفعّل.",
+       "<b>Google Play Protect:</b> in the Play Store, tap your profile picture > Play Protect, and make sure app scanning is on.")}</li>
+<li>{L("<b>امنع التطبيقات المجهولة:</b> ابحث في الإعدادات عن «تثبيت التطبيقات غير المعروفة» واجعل كل التطبيقات «غير مسموح» إلا ما تحتاجه فعلاً.",
+       "<b>Block unknown apps:</b> search Settings for “Install unknown apps” and set every app to “Not allowed” unless you really need it.")}</li>
+<li>{L("<b>راجع الوصول الخاص كل بضعة أشهر:</b> الإعدادات ← إمكانية الوصول ← التطبيقات المثبّتة، و«الوصول إلى الإشعارات» (ابحث عنه في الإعدادات). أوقف ما لا تستخدمه.",
+       "<b>Check special access every few months:</b> Settings > Accessibility > Installed apps, and “Notification access” (search Settings). Turn off anything you don't use.")}</li>
+<li>{L("<b>الشهادات:</b> ابحث في الإعدادات عن «بيانات اعتماد المستخدم» (User credentials). يجب أن تكون فارغة، إلا إن ثبّتت جهة عملك شهادة.",
+       "<b>Certificates:</b> search Settings for “User credentials”. It should be empty unless your work installed a certificate.")}</li>
+<li>{L("<b>قفل الشاشة والحسابات:</b> رمز من 6 أرقام أو أكثر لا يعرفه أحد، وتحقق بخطوتين لحساب Google بتطبيق مصادقة أو مفتاح مرور.",
+       "<b>Screen lock and accounts:</b> a PIN of 6 or more digits that nobody knows, and 2-step verification for Google with an authenticator app or passkey.")}</li>'''
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     if has_quick:
         facts = f"""<div class="facts muted">
@@ -1803,16 +1856,12 @@ def make_report(run, mode):
 <section><h2>{L("تحصين الهاتف", "Harden the phone")}</h2>
 {ap_status}
 <ul class="steps">
-<li>{L("<b>الحماية المتقدمة (Advanced Protection):</b> ابحث في الإعدادات عن «Advanced Protection» أو «الحماية المتقدمة» وفعّلها. تمنع تثبيت التطبيقات من خارج المتجر، وتوقف شبكات 2G، وتحمي منفذ USB والهاتف مقفل، وتشدّد إعدادات الحماية الأخرى. قد تقيّد بعض الميزات التي تستخدمها.",
-       "<b>Advanced Protection:</b> search Settings for “Advanced Protection” and turn it on. It blocks installing apps from outside the store, turns off 2G, protects the USB port while the phone is locked, and tightens other protections. It may limit some features you use.")}</li>
-<li>{L(f"<b>سجل التسلل (Intrusion Logging):</b> من داخل «الحماية المتقدمة» فعّل «Intrusion Logging». يحفظ الهاتف لمدة 12 شهراً، بتشفير لا يفتحه غيرك، سجلاً بتثبيت التطبيقات واستعلامات DNS وعناوين IP وتغييرات الشهادات. لتحليله بنفسك: نزّل السجلات من «Intrusion Logging ← Access logs»، ثم:",
-       "<b>Intrusion Logging:</b> inside Advanced Protection, turn on “Intrusion Logging”. For 12 months the phone keeps an encrypted log, readable only by you, of app installs, DNS lookups, IP addresses and certificate changes. To analyse it yourself, download the logs from “Intrusion Logging > Access logs”, then:")}
-<pre>{_e(tool)} --intrusion-logs intrusion-logs.zip</pre></li>
+{ap_items}
 <li>{L("<b>أعد تشغيل الهاتف يومياً:</b> كثير من برامج التجسس الحكومية لا تبقى بعد إعادة التشغيل. في هواتف سامسونج ابحث في الإعدادات عن «إعادة التشغيل التلقائي» (Auto restart).",
        "<b>Restart the phone every day:</b> much government spyware does not survive a restart. On Samsung phones, search Settings for “Auto restart”.")}</li>
 <li>{L("<b>حدّث فور صدور التحديث:</b> نظام التشغيل، ومتجر Play، وتطبيقات المراسلة والمتصفح.", "<b>Update as soon as updates appear:</b> the system, Google Play, messaging apps and the browser.")}</li>
-<li>{L("<b>افحص من جهة الشبكة أيضاً:</b> شغّل <code>spyguard-setup.sh</code> على جهاز Raspberry Pi أو جهاز Linux احتياطي، ثم صِل الهاتف بشبكة Wi-Fi التي ينشئها لمدة 30 دقيقة على الأقل.",
-       "<b>Check from the network side too:</b> run <code>spyguard-setup.sh</code> on a Raspberry Pi or spare Linux machine, then connect the phone to the Wi-Fi it creates for at least 30 minutes.")}</li>
+<li>{L("<b>افحص من جهة الشبكة أيضاً:</b> أداة <a href='https://github.com/SpyGuard/spyguard'>SpyGuard</a> المجانية تعمل على Raspberry Pi أو جهاز Linux احتياطي، وتنشئ شبكة Wi-Fi تراقب اتصالات الهاتف بحثاً عن خوادم تجسس معروفة. صِل الهاتف بها 30 دقيقة على الأقل.",
+       "<b>Check from the network side too:</b> the free <a href='https://github.com/SpyGuard/spyguard'>SpyGuard</a> runs on a Raspberry Pi or spare Linux machine and creates a Wi-Fi network that watches the phone's connections for known spyware servers. Keep the phone on it for at least 30 minutes.")}</li>
 </ul></section>
 
 <section><h2>{L("إعادة ضبط المصنع الآمنة (عند الشك الجدي)", "Safe factory reset (when you have serious doubts)")}</h2>
@@ -1824,7 +1873,7 @@ def make_report(run, mode):
 <li>{L("<b>تذكّر كلمة المرور الجديدة جيداً:</b> سيطلبها الهاتف بعد الضبط (حماية FRP).", "<b>Remember the new password well:</b> the phone asks for it after the reset (FRP protection).")}</li>
 <li>{L("<b>امسح الهاتف:</b> الإعدادات ← الإدارة العامة أو النظام ← إعادة الضبط ← محو كل البيانات.", "<b>Wipe the phone:</b> Settings > General management or System > Reset > Erase all data.")}</li>
 <li>{L("<b>لا تسترجع نسخة التطبيقات الاحتياطية.</b> ثبّت تطبيقاتك يدوياً من متجر Play فقط، ولا تثبّت ما لا تعرفه.", "<b>Do not restore the app backup.</b> Reinstall your apps by hand from Google Play only, and nothing you don't recognise.")}</li>
-<li>{L("<b>بعد الإعداد:</b> حدّث النظام، وفعّل «الحماية المتقدمة» و«سجل التسلل» إن توفرا، وضع قفل شاشة قوياً لا يعرفه أحد.", "<b>After setup:</b> update the system, turn on Advanced Protection and Intrusion Logging if available, and set a strong screen lock nobody else knows.")}</li>
+<li>{L("<b>بعد الإعداد:</b> حدّث النظام، وفعّل «الحماية المتقدمة» و«سجل التسلل»، وضع قفل شاشة قوياً لا يعرفه أحد.", "<b>After setup:</b> update the system, turn on Advanced Protection and Intrusion Logging, and set a strong screen lock nobody else knows.") if show_ap else L("<b>بعد الإعداد:</b> حدّث النظام، وتأكد أن Play Protect مفعّل، وضع قفل شاشة قوياً لا يعرفه أحد.", "<b>After setup:</b> update the system, make sure Play Protect is on, and set a strong screen lock nobody else knows.")}</li>
 <li>{L("<b>أعد الفحص بعد أسبوع.</b>", "<b>Scan again a week later.</b>")}</li>
 </ol></details></section>
 
@@ -1994,6 +2043,8 @@ def parse_args(argv=None):
     g.add_argument("--package", nargs="?", const="", metavar="AGE_KEY",
                    help="bundle the latest scan for an expert; with an age1... key it is encrypted")
     ap.add_argument("--no-vt", action="store_true", help="do not use VirusTotal")
+    ap.add_argument("--iocs", action="append", default=[], metavar="FILE",
+                    help="extra STIX2 indicators file for MVT (can be given more than once)")
     return ap.parse_args(argv)
 
 
@@ -2077,6 +2128,10 @@ def main(argv=None):
             choice = ""
         argv = {"2": ["--iphone"], "3": ["--quick"]}.get(choice, [])
     args = parse_args(argv)
+    for f in args.iocs:
+        if not Path(f).is_file():
+            die(f"Indicators file not found: {f}")
+        EXTRA_IOCS.append(str(Path(f).resolve()))
     if args.package is not None:
         mode = "package"
         if args.package and not args.package.startswith("age1"):

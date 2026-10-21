@@ -154,6 +154,7 @@ On Windows use `.\phonehackscan.cmd [option]`. On Linux and macOS use `python3 p
 | `--iphone [FOLDER]` | Analyse an iPhone backup (found automatically) |
 | `--intrusion-logs PATH` | Analyse Android 16 Intrusion Logging files (.zip or folder) |
 | `--open-app PACKAGE` | Open an app's page on the phone to review or uninstall it |
+| `--iocs FILE` | Also check against your own STIX2 indicators file (can be repeated) |
 | `--package [AGE_KEY]` | Bundle the latest scan for a security expert, optionally encrypted with age |
 
 ## Privacy
